@@ -65,7 +65,7 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
-          echo ${{steps.create_release_outputs.id}}
+          echo ${{steps.create_release.outputs.id}}
           echo "------"
           echo ${{steps.upload_release_asset.outputs.browser_download_url}}
           cd /home/golangweb/genshin-auto-sign
