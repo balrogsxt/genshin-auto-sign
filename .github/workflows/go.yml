@@ -66,4 +66,4 @@ jobs:
         port: ${{ secrets.SSH_PORT }}
         script: |
           cd /home/golangweb/genshin-auto-sign
-          ls
+          sh stop.sh #结束进程,会自动重启
