@@ -66,5 +66,6 @@ jobs:
         script: |
           cd /home/golangweb/genshin-auto-sign
           #下载构建好的文件
-          wget https://api.github.com/repos/balrogsxt/genshin-auto-sign/releases/assets/${{ steps.upload_release_asset.outputs.id }}?access_token=${{ secrets.TOKEN }} -H "accept:application/octet-stream" --header="Accept:application/octet-stream" -q -O genshin-auto-sign
-          sh stop.sh #结束进程,会自动重启
+          wget https://api.github.com/repos/balrogsxt/genshin-auto-sign/releases/assets/${{ steps.upload_release_asset.outputs.id }}?access_token=${{ secrets.TOKEN }} -H "accept:application/octet-stream" --header="Accept:application/octet-stream" -O build
+          chmod -R 777 build
+          sh replace.sh #结束进程,会自动重启
