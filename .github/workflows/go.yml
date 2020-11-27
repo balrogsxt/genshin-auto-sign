@@ -41,13 +41,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: release-${{github.sha}}
+        release_name: release-${{github.sha}}
         draft: false
         prerelease: false
   
     - name: 上传编译文件到Release
-      id: upload-release-asset
+      id: upload_release_asset
       uses: actions/upload-release-asset@master
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
@@ -65,5 +65,6 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
+          echo ${{steps.upload_release_asset.outputs.browser_download_url}}
           cd /home/golangweb/genshin-auto-sign
           sh stop.sh #结束进程,会自动重启
