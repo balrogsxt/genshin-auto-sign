@@ -65,7 +65,7 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
-          echo "----"
+          echo "---"
           echo ${{ steps.upload_release_asset.outputs.browser_download_url }}
           echo "---"
           echo ${{ steps.upload_release_asset.outputs.id }}
