@@ -4,7 +4,7 @@
 该项目用于处理米游社原神版块每日签到自动化处理功能,需要玩家提供米游社account_id与cookie_token实现
 
 ## 配置
-> 配置才用yaml配置文件,配置如下
+> 在根目录创建`config.yaml`文件,配置采用yaml配置文件 
 ```
 #运行模式 release=生产环境 test=测试环境 debug=调试环境
 run_mode: release
