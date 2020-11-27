@@ -48,7 +48,7 @@ jobs:
   
     - name: 上传编译文件到Release
       id: upload_release_asset
-      uses: actions/upload-release-asset@master
+      uses: balrogsxt/upload-release-asset@main
       env:
         GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
