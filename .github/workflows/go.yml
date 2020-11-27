@@ -29,8 +29,26 @@ jobs:
             dep ensure
         fi
 
-    - name: Build
+    - name: 编译项目
       run: |
         go build main.go
-        echo "目录"
-        ls
+        
+    - name: 发布Release
+      id: create_release
+      uses: actions/create-release@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+      with:
+        tag_name: release
+        release_name: Release
+        draft: false
+        prerelease: false
+        
+    - name: 远程服务器部署
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: ls
