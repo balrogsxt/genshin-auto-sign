@@ -65,7 +65,10 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
+          echo "---"
+          echo ${{ steps.upload_release_asset.outputs.id }}
+          echo "---"
           cd /home/golangweb/genshin-auto-sign
           #下载构建好的文件
-          wget https://api.github.com/repos/balrogsxt/genshin-auto-sign/releases/assets/${{steps.upload_release_asset.outputs.id}}?access_token=${{ secrets.TOKEN }} -H "accept:application/octet-stream" --header="Accept:application/octet-stream" -O genshin-auto-sign1
+          wget https://api.github.com/repos/balrogsxt/genshin-auto-sign/releases/assets/${{ steps.upload_release_asset.outputs.id }}?access_token=${{ secrets.TOKEN }} -H "accept:application/octet-stream" --header="Accept:application/octet-stream" -O genshin-auto-sign1
           sh stop.sh #结束进程,会自动重启
