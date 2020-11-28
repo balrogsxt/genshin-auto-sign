@@ -114,12 +114,7 @@ go build main.go
 ## github actions自动编译
 - 1.获取github token
 - 2.设置项目仓库secrets
-> 如果不需要自动部署到服务器,删除工作流下go.yml中`远程服务器部署`流程
 ```
 //设置仓库secrets
-SSH_HOST //ssh地址
-SSH_KEY //ssh密钥
-SSH_PORT //ssh端口
-SSH_USER //ssh用户名
 TOKEN //github token
 ```
