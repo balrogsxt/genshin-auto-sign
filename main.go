@@ -13,6 +13,8 @@ import (
 	"net/http"
 )
 
+const Version = "1.0.0"
+
 var _cron *cron.Cron
 
 func main() {
@@ -23,6 +25,7 @@ func main() {
 			fmt.Printf("运行异常: %#v \n", err)
 		}
 	}()
+	fmt.Println("CurrentVersion: ", Version)
 	conf := helper.GetConfig()
 
 	//载入配置文件
