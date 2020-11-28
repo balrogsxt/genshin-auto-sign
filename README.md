@@ -34,10 +34,24 @@ redis:
     password: 123456789
 #redis选择库 
     index: 1
+#mirai qq机器人配置
+qqbot:
+    #接口地址
+    url: http://*****:8080
+    #机器人qq号
+    qq: ******
+    #机器人密钥
+    key: ********
+    #绑定成功后通知的群组(数组)
+    bind_notify_group:
+        - ****群号
+    #签到成功后通知的群组(数组)
+    sign_notify_group:
+        - *****群号
 ```
 
 
-## 启动&编译
+## 本地编译&启动
 ```
 //设置环境,linux、windows
 SET GOOS=linux
@@ -45,4 +59,16 @@ SET GOOS=linux
 go run main.go
 //编译
 go build main.go
+```
+## github actions自动编译
+- 1.获取github token
+- 2.设置项目仓库secrets
+> 如果不需要自动部署到服务器,删除工作流下go.yml中`远程服务器部署`流程
+```
+//设置仓库secrets
+SSH_HOST //ssh地址
+SSH_KEY //ssh密钥
+SSH_PORT //ssh端口
+SSH_USER //ssh用户名
+TOKEN //github token
 ```

@@ -103,7 +103,7 @@ func GetInfo(c *gin.Context) {
 	//判断今日是否签到
 	isSign := false
 	time.Now().Format("2006-01-02")
-	t, _ := time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
+	t, _ := time.ParseInLocation("2006-01-02", time.Now().Format("2006-01-02"), time.Local)
 	if um.SignTime >= t.Unix() {
 		isSign = true
 		//如果今日已签到的情况下,直接进入redis缓存!
@@ -175,10 +175,10 @@ func BindPlayer(c *gin.Context) {
 		app.NewException("绑定过于频繁,请稍后再试!")
 	}
 
-	api := api.NewGenshinApi()
+	genshin := api.NewGenshinApi()
 	cookie := fmt.Sprintf("account_id=%s;cookie_token=%s", accountId, cookieToken)
 
-	player, err := api.GetPlayerInfo(cookie)
+	player, err := genshin.GetPlayerInfo(cookie)
 	if err != nil {
 		app.NewException(fmt.Sprintf("获取游戏角色失败:%s", err.Error()))
 	}
@@ -208,7 +208,7 @@ func BindPlayer(c *gin.Context) {
 				fmt.Printf("运行及时签到失败: %#v \n", err)
 			}
 		}()
-		signStatus, err := api.RunSign(player.GameUid, cookie)
+		signStatus, err := genshin.RunSign(player.GameUid, cookie)
 		isUpdate := false
 		if signStatus == 0 {
 			//fmt.Println(player.NickName,":今日签到成功")
@@ -222,7 +222,7 @@ func BindPlayer(c *gin.Context) {
 
 		//更新数据库为签到时间
 		if isUpdate {
-			info, err := api.GetPlayerSignInfo(player.GameUid, cookie)
+			info, err := genshin.GetPlayerSignInfo(player.GameUid, cookie)
 			if err == nil {
 				um := new(app.UserModel)
 				um.SignTime = time.Now().Unix()
@@ -239,10 +239,19 @@ func BindPlayer(c *gin.Context) {
 				}
 			}
 		}
-
 	}()
+
 	t := time.Now().Format("2006-01-02 15:04:05")
-	fmt.Printf("[%s] -> 来自【%s】的旅行者“%s”(%s) 绑定自动签到成功! \n", t, player.ServerName, player.NickName, player.GameUid)
+	msg := fmt.Sprintf("[%s] -> 来自【%s】的旅行者“%s”(%s) 绑定自动签到成功! \n", t, player.ServerName, player.NickName, player.GameUid)
+
+	//发送绑定通知到群内
+	bot := api.NewQQBot()
+	for _, g := range helper.GetConfig().QQBot.BindNotifyGroup {
+		bot.SendMessage(g, []string{
+			msg,
+		})
+	}
+
 	c.JSON(200, gin.H{
 		"status": 0,
 		"msg":    "绑定成功",

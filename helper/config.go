@@ -35,6 +35,13 @@ type Config struct {
 		Password string
 		Index    int
 	}
+	QQBot struct {
+		Url             string
+		QQ              string
+		Key             string
+		BindNotifyGroup []string `yaml:"bind_notify_group"` //绑定用户成功后通知的群组
+		SignNotifyGroup []string `yaml:"sign_notify_group"` //签到成功后通知的群组
+	}
 }
 
 //获取配置文件

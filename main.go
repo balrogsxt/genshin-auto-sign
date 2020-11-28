@@ -1,25 +1,32 @@
 package main
 
 import (
-	"github.com/balrogsxt/genshin-auto-sign/helper"
-	_ "github.com/balrogsxt/genshin-auto-sign/helper"
-	"net/http"
-
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/app"
 	"github.com/balrogsxt/genshin-auto-sign/controller"
 	"github.com/balrogsxt/genshin-auto-sign/controller/middleware"
+	"github.com/balrogsxt/genshin-auto-sign/helper"
+	_ "github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/task"
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron"
+	"net/http"
 )
 
+var _cron *cron.Cron
+
 func main() {
+	_cron = cron.New()
 	defer func() {
+		_cron.Stop()
 		if err := recover(); err != nil {
 			fmt.Printf("运行异常: %#v \n", err)
 		}
 	}()
-	//载入配置文件
 	conf := helper.GetConfig()
+
+	//载入配置文件
+	registerTask()
 	gin.SetMode(conf.RunMode)
 	r := gin.New()
 	registerRouter(r)
@@ -28,6 +35,20 @@ func main() {
 	r.Run(uri)
 }
 
+//注册任务计划
+func registerTask() {
+	//每5分钟执行一次
+	_cron.AddFunc("0 */5 * * * *", func() {
+		task.RunSignTask(false)
+	})
+	//每天凌晨00:00:10执行一次
+	_cron.AddFunc("10 0 0 * * *", func() {
+		task.RunSignTask(true)
+	})
+
+	fmt.Println("启动任务计划")
+	_cron.Start()
+}
 func registerRouter(r *gin.Engine) {
 	//注册路由中间件
 	r.Use(tryCatch())
