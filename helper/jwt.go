@@ -5,16 +5,14 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-const Key = "^*&@#*R&@#GIshdal"
-
 func JwtBuild(_map jwt.MapClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, _map)
-	jwt, err := token.SignedString([]byte(Key))
+	jwt, err := token.SignedString([]byte(GetConfig().JwtKey))
 	return jwt, err
 }
 func JwtParse(str string) (jwt.MapClaims, error) {
 	claim, err := jwt.Parse(str, func(token *jwt.Token) (interface{}, error) {
-		return []byte(Key), nil
+		return []byte(GetConfig().JwtKey), nil
 	})
 	if err != nil {
 		return nil, err

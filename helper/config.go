@@ -17,6 +17,7 @@ type Config struct {
 	RedirectTokenUrl string `yaml:"redirect_token_url"` //登录成功后的回调token地址 ,变量%token%
 	HttpHost         string `yaml:"http_host"`          //服务绑定地址
 	HttpPort         int    `yaml:"http_port"`          //服务启动端口
+	JwtKey           string `yaml:"jwt_key"`            //jwt密钥
 	QQOauth          struct {
 		ClientId     string `yaml:"client_id"`
 		ClientSecret string `yaml:"client_secret"`

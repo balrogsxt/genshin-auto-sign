@@ -55,17 +55,3 @@ jobs:
         asset_path: ./genshin-auto-sign # 要上传文件
         asset_name: genshin-auto-sign # 上传后的文件名
         asset_content_type: application/octet-stream
-        
-    - name: 远程服务器部署
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.SSH_PORT }}
-        script: |
-          cd /home/golangweb/genshin-auto-sign
-          #下载构建好的文件
-          wget https://api.github.com/repos/balrogsxt/genshin-auto-sign/releases/assets/${{ steps.upload_release_asset.outputs.id }}?access_token=${{ secrets.TOKEN }} -H "accept:application/octet-stream" --header="Accept:application/octet-stream" -O build
-          chmod -R 777 build
-          sh replace.sh #结束进程,会自动重启
