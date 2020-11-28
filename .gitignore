@@ -2,3 +2,5 @@ config.yaml
 main
 main.exe
 .idea
+bin
+obj
