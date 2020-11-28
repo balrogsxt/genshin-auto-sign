@@ -58,7 +58,7 @@ namespace bbs_getcookie {
 
                     }
                 } catch(Exception e) {
-
+                    MessageBox.Show("发生错误:"+e.Message);
                 }
             };
         }
