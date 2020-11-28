@@ -5,24 +5,29 @@ import (
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
 	"github.com/imroc/req"
+	"time"
 )
 
 type QQBot struct {
-	url     string //服务器地址
-	qq      string //机器人QQ号
-	key     string //密钥
-	session string
+	url         string //服务器地址
+	qq          string //机器人QQ号
+	key         string //密钥
+	session     string
+	sessionTime int64 //上一次使用时间
 }
 
-func NewQQBot() *QQBot {
-	q := new(QQBot)
+var qqbot *QQBot
 
+func GetQQBot() *QQBot {
+	if qqbot != nil {
+		return qqbot
+	}
+	qqbot := new(QQBot)
 	conf := helper.GetConfig().QQBot
-	q.url = conf.Url
-	q.qq = conf.QQ
-	q.key = conf.Key
-
-	return q
+	qqbot.url = conf.Url
+	qqbot.qq = conf.QQ
+	qqbot.key = conf.Key
+	return qqbot
 }
 
 func (this QQBot) SendMessage(target interface{}, textList []string) {
@@ -68,9 +73,15 @@ func (this QQBot) SendMessage(target interface{}, textList []string) {
 }
 
 func (this QQBot) getSession() (string, error) {
-	if len(this.session) != 0 {
-		return this.session, nil
+	if 1000 >= time.Now().Unix()-this.sessionTime {
+		if len(this.session) != 0 {
+			this.sessionTime = time.Now().Unix()
+			return this.session, nil
+		}
 	}
+	this.sessionTime = 0
+	this.session = ""
+
 	session, err := this.auth()
 	if err != nil {
 		return "", err
@@ -80,6 +91,7 @@ func (this QQBot) getSession() (string, error) {
 		return "", err
 	}
 	this.session = session
+	this.sessionTime = time.Now().Unix()
 	return session, nil
 }
 func (this *QQBot) verify(session string) error {

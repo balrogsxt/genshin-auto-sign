@@ -202,7 +202,7 @@ func BindPlayer(c *gin.Context) {
 		app.NewException("绑定失败,系统错误!")
 	}
 	//绑定成功后,直接调用一次接口
-	go func() {
+	go func(player *api.GenshinPlayer) {
 		defer func() {
 			if err := recover(); err != nil {
 				fmt.Printf("运行及时签到失败: %#v \n", err)
@@ -213,6 +213,7 @@ func BindPlayer(c *gin.Context) {
 		if signStatus == 0 {
 			//fmt.Println(player.NickName,":今日签到成功")
 			isUpdate = true
+
 		} else if signStatus == 1 {
 			//fmt.Println(player.NickName,":今日已签到,无需重复签到")
 			isUpdate = true
@@ -235,17 +236,26 @@ func BindPlayer(c *gin.Context) {
 					Update(um); err != nil {
 					fmt.Println("更新数据失败:", err.Error())
 				} else {
-					//fmt.Println("更新签到数据成功!")
+					bot := api.GetQQBot()
+					notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
+					notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", info.TotalSignDay, player.NickName, player.GameUid)
+
+					for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
+						bot.SendMessage(g, []string{
+							notifyMsg,
+						})
+					}
+
 				}
 			}
 		}
-	}()
+	}(player)
 
 	t := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf("[%s] -> 来自【%s】的旅行者“%s”(%s) 绑定自动签到成功! \n", t, player.ServerName, player.NickName, player.GameUid)
 
 	//发送绑定通知到群内
-	bot := api.NewQQBot()
+	bot := api.GetQQBot()
 	for _, g := range helper.GetConfig().QQBot.BindNotifyGroup {
 		bot.SendMessage(g, []string{
 			msg,

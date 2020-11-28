@@ -112,7 +112,7 @@ func RunSignTask(isFirst bool) {
 			notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", item.TotalSign, item.PlayerName, item.PlayerUid)
 		}
 		//发送签到通知到群内
-		bot := api.NewQQBot()
+		bot := api.GetQQBot()
 		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
 			bot.SendMessage(g, []string{
 				notifyMsg,
