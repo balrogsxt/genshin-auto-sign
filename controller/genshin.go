@@ -210,10 +210,11 @@ func BindPlayer(c *gin.Context) {
 		}()
 		signStatus, err := genshin.RunSign(player.GameUid, cookie)
 		isUpdate := false
+		isNotifySign := false
 		if signStatus == 0 {
 			//fmt.Println(player.NickName,":今日签到成功")
 			isUpdate = true
-
+			isNotifySign = true
 		} else if signStatus == 1 {
 			//fmt.Println(player.NickName,":今日已签到,无需重复签到")
 			isUpdate = true
@@ -236,16 +237,17 @@ func BindPlayer(c *gin.Context) {
 					Update(um); err != nil {
 					fmt.Println("更新数据失败:", err.Error())
 				} else {
-					bot := api.GetQQBot()
-					notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
-					notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", info.TotalSignDay, player.NickName, player.GameUid)
+					if isNotifySign {
+						bot := api.GetQQBot()
+						notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
+						notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", info.TotalSignDay, player.NickName, player.GameUid)
 
-					for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
-						bot.SendMessage(g, []string{
-							notifyMsg,
-						})
+						for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
+							bot.SendMessage(g, []string{
+								notifyMsg,
+							})
+						}
 					}
-
 				}
 			}
 		}
