@@ -5,6 +5,7 @@ import (
 	"github.com/balrogsxt/genshin-auto-sign/api"
 	"github.com/balrogsxt/genshin-auto-sign/app"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"math/rand"
@@ -50,13 +51,18 @@ func LoginVerify(c *gin.Context) {
 	//验证是否注册过账户
 	has, err := app.GetDb().Where("openid = ?", openid).Get(&um)
 	if has == false {
+		conf := helper.GetConfig()
+		if conf.NewUser == false {
+			app.NewException("当前暂未开放新用户使用...(以前登录过的用户可正常使用)")
+		}
+
 		//账户未注册,先注册
 		userModel := new(app.UserModel)
 		userModel.OpenId = openid
 		userModel.CreateTime = time.Now().Unix()
 		_, err := app.GetDb().Insert(userModel)
 		if err != nil {
-			fmt.Println("注册失败:", err.Error())
+			log.Info("注册失败:", err.Error())
 			app.NewException("账户注册失败...请稍后再试!")
 		}
 		userId = userModel.Id
@@ -116,7 +122,8 @@ func GetInfo(c *gin.Context) {
 		"msg":    "ok",
 		"data": gin.H{
 			//返回用户部分基础数据
-			"id": um.Id,
+			"id":    um.Id,
+			"email": um.Email,
 			//绑定的游戏角色
 			"isBind": isBind, //是否绑定过用户
 			"bindPlayer": gin.H{
@@ -155,6 +162,31 @@ func GetToken(c *gin.Context) {
 	})
 }
 
+//绑定邮箱
+func BindEmail(c *gin.Context) {
+	email := c.PostForm("email")
+	if !helper.IsEmail(email) {
+		app.NewException("邮箱格式不正确")
+	}
+
+	userid := c.GetInt64("userid")
+
+	um := new(app.UserModel)
+	um.Email = email
+	//邮箱允许重复
+	if _, err := app.GetDb().
+		Cols("email").
+		Where("id = ?", userid).
+		Update(um); err != nil {
+		log.Info("绑定失败:", err.Error())
+		app.NewException("绑定失败,系统错误!")
+	}
+	c.JSON(200, gin.H{
+		"status": 0,
+		"msg":    "绑定邮箱成功",
+	})
+}
+
 //绑定角色
 func BindPlayer(c *gin.Context) {
 
@@ -178,7 +210,7 @@ func BindPlayer(c *gin.Context) {
 	genshin := api.NewGenshinApi()
 	cookie := fmt.Sprintf("account_id=%s;cookie_token=%s", accountId, cookieToken)
 
-	player, err := genshin.GetPlayerInfo(cookie)
+	player, _, err := genshin.GetPlayerInfo(cookie)
 	if err != nil {
 		app.NewException(fmt.Sprintf("获取游戏角色失败:%s", err.Error()))
 	}
@@ -198,28 +230,28 @@ func BindPlayer(c *gin.Context) {
 		).
 		Where("id = ?", userid).
 		Update(um); err != nil {
-		fmt.Println("绑定失败:", err.Error())
+		log.Info("绑定失败:", err.Error())
 		app.NewException("绑定失败,系统错误!")
 	}
 	//绑定成功后,直接调用一次接口
 	go func(player *api.GenshinPlayer) {
 		defer func() {
 			if err := recover(); err != nil {
-				fmt.Printf("运行及时签到失败: %#v \n", err)
+				log.Info("运行及时签到失败: %#v", err)
 			}
 		}()
-		signStatus, err := genshin.RunSign(player.GameUid, cookie)
+		signStatus, _, err := genshin.RunSign(player.GameUid, cookie)
 		isUpdate := false
 		isNotifySign := false
 		if signStatus == 0 {
-			//fmt.Println(player.NickName,":今日签到成功")
+			//log.Info(player.NickName,":今日签到成功")
 			isUpdate = true
 			isNotifySign = true
 		} else if signStatus == 1 {
-			//fmt.Println(player.NickName,":今日已签到,无需重复签到")
+			//log.Info(player.NickName,":今日已签到,无需重复签到")
 			isUpdate = true
 		} else {
-			fmt.Println(player.NickName, ":绑定签到运行失败", err)
+			log.Info(player.NickName, ":绑定签到运行失败", err)
 		}
 
 		//更新数据库为签到时间
@@ -235,7 +267,7 @@ func BindPlayer(c *gin.Context) {
 					Cols("sign_time", "total_sign").
 					Where("id = ?", userid).
 					Update(um); err != nil {
-					fmt.Println("更新数据失败:", err.Error())
+					log.Info("更新数据失败:", err.Error())
 				} else {
 					if isNotifySign {
 						bot := api.GetQQBot()

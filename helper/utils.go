@@ -23,3 +23,26 @@ func Md5(str string) string {
 	m.Write([]byte(str))
 	return hex.EncodeToString(m.Sum(nil))
 }
+
+//send mail
+func SendEmail(targetEmail string, text string) {
+	//host := ""
+	//user := ""
+	//password := ""
+
+	// todo 后续增加发送邮件通知功能
+	//intln("send mail....")
+	//auth := smtp.PlainAuth("", user, password, host)
+	//msg := []byte("测试")
+	//
+	//to := []string{
+	//	"",
+	//}
+	//
+	//err := smtp.SendMail(host, auth, user, to, msg)
+	//if err != nil {
+	//	log.Info("err->", err)
+	//} else {
+	//	log.Info("ok")
+	//}
+}

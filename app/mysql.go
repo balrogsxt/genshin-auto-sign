@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
 )
@@ -15,9 +16,9 @@ func init() {
 	engine, _ = xorm.NewEngine("mysql", dsn)
 	err := engine.Ping()
 	if err != nil {
-		fmt.Println("mysql连接数据库失败")
+		log.Info("mysql连接数据库失败")
 	} else {
-		fmt.Println("mysql连接数据库成功!!!")
+		log.Info("mysql连接数据库成功!!!")
 	}
 }
 func GetDb() *xorm.Engine {
@@ -36,6 +37,7 @@ type UserModel struct {
 	BindTime        int64  `xorm:"bind_time"`   //绑定时间
 	SignTime        int64  `xorm:"sign_time"`   //签到时间
 	TotalSign       int    `xorm:"total_sign"`  //累计签到天数
+	Email           string `xorm:"email"`       //邮箱
 }
 
 func (t *UserModel) TableName() string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -23,9 +24,9 @@ func initRDB() {
 	})
 	err := rdb.Ping(ctx).Err()
 	if err != nil {
-		fmt.Println("Redis连接异常!")
+		log.Info("Redis连接异常!")
 	} else {
-		fmt.Println("Redis已连接成功!!!!")
+		log.Info("Redis已连接成功!!!!")
 	}
 }
 func GetCtx() context.Context {

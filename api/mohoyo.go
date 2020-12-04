@@ -3,9 +3,12 @@ package api
 import (
 	"errors"
 	"fmt"
+	"github.com/balrogsxt/genshin-auto-sign/app"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	"github.com/imroc/req"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -26,14 +29,14 @@ func NewGenshinApi() *GenshinApi {
 }
 
 //获取玩家角色信息
-func (this *GenshinApi) GetPlayerInfo(cookie string) (*GenshinPlayer, error) {
+func (this *GenshinApi) GetPlayerInfo(cookie string) (*GenshinPlayer, int, error) {
 	uri := "https://api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie?game_biz=hk4e_cn"
 	header := req.Header{
 		"Cookie": cookie,
 	}
 	res, err := req.Get(uri, header)
 	if err != nil {
-		return nil, err
+		return nil, 999, err
 	}
 
 	model := struct {
@@ -45,15 +48,16 @@ func (this *GenshinApi) GetPlayerInfo(cookie string) (*GenshinPlayer, error) {
 	}{}
 
 	if err := res.ToJSON(&model); err != nil {
-		return nil, err
+		return nil, 997, err
 	}
 	if model.RetCode != 0 {
-		return nil, errors.New(model.Message)
+		log.Info("%#v log.Info", model)
+		return nil, model.RetCode, errors.New(model.Message)
 	}
 	if len(model.Data.List) == 0 {
-		return nil, errors.New("未绑定游戏角色")
+		return nil, 998, errors.New("未绑定玩家角色")
 	}
-	return &model.Data.List[0], nil
+	return &model.Data.List[0], 0, nil
 }
 
 //获取玩家签到信息
@@ -78,8 +82,14 @@ func (this *GenshinApi) GetPlayerSignInfo(playerUid string, cookie string) (*Gen
 	return &model.Data, nil
 }
 
-//运行玩家签到
-func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, error) {
+//运行玩家签到 return 状态,是否远程调用,错误
+func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, bool, error) {
+
+	requestJson := map[string]interface{}{
+		"act_id": ActId,
+		"region": Region,
+		"uid":    playerUid,
+	}
 	uri := "https://api-takumi.mihoyo.com/event/bbs_sign_reward/sign"
 	header := req.Header{
 		"Content-Type":      "application/json",
@@ -91,15 +101,6 @@ func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, error) {
 		"DS":                getDs(),
 		"User-Agent":        UserAgent,
 	}
-	json := req.BodyJSON(map[string]interface{}{
-		"act_id": ActId,
-		"region": Region,
-		"uid":    playerUid,
-	})
-	res, err := req.Post(uri, header, json)
-	if err != nil {
-		return 2, err
-	}
 
 	model := struct {
 		RetCode int
@@ -108,17 +109,73 @@ func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, error) {
 			Code string
 		}
 	}{}
+	curlEnv, err := app.GetRDB().LPop(app.GetCtx(), "remoteApiPool").Result()
+	if err == nil {
+		app.GetRDB().RPush(app.GetCtx(), "remoteApiPool", curlEnv)
+	}
+	log.Info("")
+	if helper.IsUrl(curlEnv) {
+		log.Info("【当前使用远程Curl执行: %s】", curlEnv)
+		h := make([]string, 0)
+		for k, v := range header {
+			h = append(h, fmt.Sprintf("%s:%s", k, v))
+		}
 
-	if err := res.ToJSON(&model); err != nil {
-		return 2, err
-	}
-	if model.RetCode == 0 && (model.Data.Code == "ok" || len(model.Data.Code) > 0) {
-		return 0, nil
-	} else if model.RetCode == -5003 {
-		return 1, nil //已经签到过了
+		//远程环境运行
+		param := req.Param{
+			"url":    uri,
+			"header": h,
+			"data":   helper.JsonEncode(requestJson),
+		}
+
+		res, err := req.Post(curlEnv, param)
+		if err != nil {
+			return 500, true, err
+		}
+		if res.Response().StatusCode != 200 {
+			return 500, true, errors.New("请求失败: " + res.Response().Status)
+		}
+		resultStr, _ := res.ToString()
+		if strings.Contains(resultStr, "Requests") {
+			return 500, true, errors.New("请求服务器频繁")
+		}
+		if err := res.ToJSON(&model); err != nil {
+			return 2, true, err
+		}
+		if model.RetCode == 0 && (model.Data.Code == "ok" || len(model.Data.Code) > 0) {
+			return 0, true, nil
+		} else if model.RetCode == -5003 {
+			return 1, true, nil //已经签到过了
+		} else {
+			log.Info("签到异常: %s", resultStr)
+			return 2, true, errors.New(model.Message + " 原始返回数据: " + resultStr)
+		}
 	} else {
-		return 2, errors.New(model.Message)
+		log.Info("【当前使用本地环境执行】")
+		//本地环境运行
+		json := req.BodyJSON(requestJson)
+		res, err := req.Post(uri, header, json)
+		if err != nil {
+			return 2, false, err
+		}
+		resultStr, _ := res.ToString()
+		if strings.Contains(resultStr, "Requests") {
+			return 500, false, errors.New("请求服务器频繁")
+		}
+
+		if err := res.ToJSON(&model); err != nil {
+			return 2, false, err
+		}
+		if model.RetCode == 0 && (model.Data.Code == "ok" || len(model.Data.Code) > 0) {
+			return 0, false, nil
+		} else if model.RetCode == -5003 {
+			return 1, false, nil //已经签到过了
+		} else {
+			log.Info("签到异常: %s", resultStr)
+			return 2, false, errors.New(model.Message + " 原始返回数据: " + resultStr)
+		}
 	}
+
 }
 
 type GenshinPlayer struct {

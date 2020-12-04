@@ -54,6 +54,14 @@ qqbot:
     #签到成功后通知的群组(数组)
     sign_notify_group:
         - *****群号
+    #cookie过期后通知的群组(数组)
+    expire_notify_group:
+        - ****群号
+#由于米游社api请求过多会导致失败,这里可以配置远程curl接口调用
+curl_api:
+  - https://miku.icu/remote.php
+  - https://static.mikudoc.com:31084/genshin/remote.php
+
 ```
 > mysql数据库配置,就一张表 `user`
 ```

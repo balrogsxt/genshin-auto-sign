@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
+	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	"github.com/imroc/req"
 	"time"
 )
@@ -33,7 +34,7 @@ func GetQQBot() *QQBot {
 func (this QQBot) SendMessage(target interface{}, textList []string) {
 	session, err := this.getSession()
 	if err != nil {
-		fmt.Println("获取session失败:", err)
+		log.Info("获取session失败:", err)
 		return
 	}
 
@@ -53,7 +54,7 @@ func (this QQBot) SendMessage(target interface{}, textList []string) {
 	})
 	res, err := req.Post(u, j)
 	if err != nil {
-		fmt.Println("发送失败:", err)
+		log.Info("发送失败:", err)
 		return
 	}
 	json := struct {
@@ -62,14 +63,14 @@ func (this QQBot) SendMessage(target interface{}, textList []string) {
 		MessageId int
 	}{}
 	if err := res.ToJSON(&json); err != nil {
-		fmt.Println("发送失败:", err)
+		log.Info("发送失败:", err)
 		return
 	}
 	if json.Code != 0 {
-		fmt.Println("获取失败:" + json.Msg)
+		log.Info("获取失败:" + json.Msg)
 		return
 	}
-	fmt.Printf("[群消息]群ID:%s -> 发送成功 -> %d \n", target, json.MessageId)
+	log.Info("[群消息]群ID:%s -> 发送成功 -> %d", target, json.MessageId)
 }
 
 func (this QQBot) getSession() (string, error) {
