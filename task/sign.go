@@ -47,7 +47,7 @@ func RunSignTask(isFirst bool) {
 
 			defer func() {
 				if err := recover(); err != nil {
-					log.Info("%d -> 签到意外错误: %s", item.Id, err)
+					log.Info("用户ID: %#v -> 签到意外错误: %s", item.Id, err)
 				}
 			}()
 
@@ -59,7 +59,7 @@ func RunSignTask(isFirst bool) {
 				}
 				player, state, err := genshin.GetPlayerInfo(cookie)
 				if state != 0 {
-					log.Info("%d -> 获取米游社签到信息失败: %s", item.Id, err.Error())
+					log.Info("用户ID: %#v -> 获取米游社签到信息失败: %s", item.Id, err.Error())
 					if state == -100 {
 						//登录失效,清空cookie
 						go func(item *app.UserModel) {
@@ -94,11 +94,11 @@ func RunSignTask(isFirst bool) {
 						//签到成功
 						signInfo.TotalSignDay += 1
 						item.TotalSign = signInfo.TotalSignDay
-						log.Info("[%s]%s(%s) 签到成功->当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, signInfo.TotalSignDay)
+						log.Info("[%s]%s(%s) 用户ID: %#v -> 签到成功 -> 当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, item.Id, signInfo.TotalSignDay)
 					} else if status == 1 {
 						//今日已签到
 						item.TotalSign = signInfo.TotalSignDay
-						log.Info("[%s]%s(%s) 已经签到->当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, signInfo.TotalSignDay)
+						log.Info("[%s]%s(%s) 用户ID:%#v -> 已经签到 -> 当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, item.Id, signInfo.TotalSignDay)
 					} else {
 						//签到失败
 						log.Info("[签到失败] 用户ID:%#v -> 状态: %#v -> 错误信息: %#v ", item.Id, status, err)

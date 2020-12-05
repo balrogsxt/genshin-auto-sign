@@ -124,18 +124,18 @@ func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, bool, err
 		//远程环境运行
 		param := req.Param{
 			"url":    uri,
-			"header": h,
+			"header": helper.JsonEncode(h),
 			"data":   helper.JsonEncode(requestJson),
 		}
-
 		res, err := req.Post(curlEnv, param)
 		if err != nil {
 			return 500, true, err
 		}
+		resultStr, _ := res.ToString()
+		log.Info("[远程返回详细] %s", resultStr)
 		if res.Response().StatusCode != 200 {
 			return 500, true, errors.New("请求失败: " + res.Response().Status)
 		}
-		resultStr, _ := res.ToString()
 		if strings.Contains(resultStr, "Requests") {
 			return 500, true, errors.New("请求服务器频繁")
 		}
@@ -159,6 +159,7 @@ func (this *GenshinApi) RunSign(playerUid string, cookie string) (int, bool, err
 			return 2, false, err
 		}
 		resultStr, _ := res.ToString()
+		log.Info("[本地返回详情] %s", resultStr)
 		if strings.Contains(resultStr, "Requests") {
 			return 500, false, errors.New("请求服务器频繁")
 		}

@@ -1,7 +1,7 @@
 <?php
 $url = $_POST['url']??'';
 $header = $_POST['header']??'[]';
-$header = json_decode($header);
+$header = json_decode($header,true);
 $data = $_POST['data']??'';
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $url);
