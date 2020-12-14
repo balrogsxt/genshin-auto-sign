@@ -7,7 +7,7 @@
 本项目主要是服务端API功能,网页方面需要自行实现或copy上面在线地址~,该项目用于处理米游社原神版块每日签到自动化处理功能,需要玩家提供米游社account_id与cookie_token实现,为了防止滥用,每一个QQ账号只允许绑定一个米游社账户
 
 ## 任务计划
-项目运行后,每5分钟、每天凌晨0点都会触发一次签到操作,没有签到的用户将被处理
+项目运行后,每5分钟、每天凌晨0点都会触发一次签到操作,没有签到的用户将被处理【需要配置task配置】
 
 ## 配置
 > 在根目录创建`config.yaml`文件,配置采用yaml配置文件 
@@ -36,11 +36,9 @@ mysql:
 redis:
     host: 127.0.0.1
     port: 6379
-#redis密码
     password: 123456789
-#redis选择库 
-    index: 1
-#mirai qq机器人配置
+    index: 1 #redis选择库
+#mirai qq http插件机器人配置
 qqbot:
     #接口地址
     url: http://*****:8080
@@ -58,10 +56,14 @@ qqbot:
     expire_notify_group:
         - ****群号
 #由于米游社api请求过多会导致失败,这里可以配置远程curl接口调用
+#数组api列表【文件位于项目目录curl目录下remote.php文件env >= php7.0】
 curl_api:
-  - https://miku.icu/remote.php
-  - https://static.mikudoc.com:31084/genshin/remote.php
-
+  - https://*********/remote.php
+  - https://*********/xxx/remote.php
+#任务触发时间,第一个值将作为凌晨多次检测触发
+task:
+  - 10 0 0 * * *   #每日凌晨0点0分第十秒触发
+  - 0 */5 * * * *  #每5分钟触发一次
 ```
 > mysql数据库配置,就一张表 `user`
 ```
@@ -104,6 +106,7 @@ CREATE TABLE `user` (
 无参数
 
 > `POST` /bind 绑定米游社账户
+> `POST` /unbind 解除绑定
 
 |参数名|类型|说明|
 |:----:|:----|----:|

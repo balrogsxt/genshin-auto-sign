@@ -14,7 +14,7 @@ import (
 	"net/http"
 )
 
-const Version = "1.0.2"
+const Version = "1.0.3"
 
 var _cron *cron.Cron
 
@@ -43,23 +43,27 @@ func initConfig() *helper.Config {
 	conf.CurlApi = append(conf.CurlApi, "live")
 	//填装远程api队列到redis
 	app.GetRDB().LPush(app.GetCtx(), "remoteApiPool", conf.CurlApi)
+	for _, u := range conf.CurlApi {
+		log.Info("[远程API] 远程API接口: [ %s ]", u)
+	}
 	log.Info("载入远程API完成,可调用的远程API数量: %d ", len(conf.CurlApi))
 	return conf
 }
 
 //注册任务计划
 func registerTask() {
-	//每1分钟执行一次
-	_cron.AddFunc("0 */1 * * * *", func() {
-		task.RunSignTask(false)
-	})
-	//每天凌晨00:00:10执行一次
-	_cron.AddFunc("10 0 0 * * *", func() {
-		task.RunSignTask(true)
-	})
-	log.Info("启动任务计划")
+	conf := helper.GetConfig()
+	for index, t := range conf.Task {
+		isFirst := false
+		if index == 0 {
+			isFirst = true
+		}
+		log.Info("[任务计划] Corn任务计划已启动：[ %s ] -> [ First:%#v ]", t, isFirst)
+		_cron.AddFunc(t, func() {
+			task.RunSignTask(isFirst)
+		})
+	}
 	task.RunSignTask(false)
-
 	_cron.Start()
 }
 func registerRouter(r *gin.Engine) {
@@ -78,6 +82,7 @@ func registerRouter(r *gin.Engine) {
 		auth.GET("/logout", controller.Logout)
 		auth.GET("/info", controller.GetInfo)
 		auth.POST("/bind", controller.BindPlayer)
+		auth.POST("/unbind", controller.UnBindPlayer)
 		auth.POST("/bindEmail", controller.BindEmail)
 	}
 

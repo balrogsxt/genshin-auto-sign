@@ -30,7 +30,7 @@ func RunSignTask(isFirst bool) {
 
 	err := app.GetDb().Where("account_id != '' and web_token != '' and sign_time < ?", t.Unix()).Find(&playerList)
 	if err != nil {
-		log.Info("查询失败: ", err.Error())
+		log.Info("查询失败: %s", err.Error())
 		return
 	}
 	signOkList := []app.UserModel{}

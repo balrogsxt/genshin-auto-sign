@@ -21,6 +21,7 @@ type Config struct {
 	JwtKey           string   `yaml:"jwt_key"`            //jwt密钥
 	NewUser          bool     `yaml:"new_user"`           //是否允许新用户使用
 	CurlApi          []string `yaml:"curl_api"`           //远程请求API
+	Task             []string `yaml:"task"`               //任务corn触发时间
 	QQOauth          struct {
 		ClientId     string `yaml:"client_id"`
 		ClientSecret string `yaml:"client_secret"`

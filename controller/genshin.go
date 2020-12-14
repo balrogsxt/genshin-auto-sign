@@ -187,6 +187,45 @@ func BindEmail(c *gin.Context) {
 	})
 }
 
+//取消绑定
+func UnBindPlayer(c *gin.Context) {
+	userid := c.GetInt64("userid")
+
+	umm := app.UserModel{}
+	app.GetDb().Where("id = ?", userid).Get(&umm)
+
+	if len(umm.MihoyoAccountId) == 0 {
+		app.NewException("当前账号还未绑定米游社!")
+	}
+
+	um := new(app.UserModel)
+	um.MihoyoWebToken = ""
+	um.MihoyoAccountId = ""
+	um.ServerName = ""
+	um.PlayerUid = ""
+	um.PlayerName = ""
+	um.BindTime = 0
+	//修改数据库
+
+	if _, err := app.GetDb().
+		Cols("account_id", "web_token",
+			"player_name", "server_name", "player_id", "bind_time",
+		).
+		Where("id = ?", userid).
+		Update(um); err != nil {
+		log.Info("取消绑定失败:", err.Error())
+		app.NewException("取消绑定失败,系统错误!")
+	}
+
+	t := time.Now().Format("2006-01-02 15:04:05")
+	msg := fmt.Sprintf("[%s] -> 来自【%s】的旅行者“%s”(%s) 已经解除米游社账户的绑定! \n", t, umm.ServerName, umm.PlayerName, umm.PlayerUid)
+	log.Info(msg)
+	c.JSON(200, gin.H{
+		"status": 0,
+		"msg":    "取消绑定成功",
+	})
+}
+
 //绑定角色
 func BindPlayer(c *gin.Context) {
 
