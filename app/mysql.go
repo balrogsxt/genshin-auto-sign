@@ -24,22 +24,3 @@ func init() {
 func GetDb() *xorm.Engine {
 	return engine
 }
-
-type UserModel struct {
-	Id              int    `xorm:"pk autoincr"` //自增ID
-	OpenId          string `xorm:"openid"`      //qqopenid
-	MihoyoAccountId string `xorm:"account_id"`  //米游社账户Id
-	MihoyoWebToken  string `xorm:"web_token"`   //米游社账户Token
-	CreateTime      int64  `xorm:"create_time"` //注册时间
-	PlayerUid       string `xorm:"player_id"`   //玩家Uid
-	PlayerName      string `xorm:"player_name"` //玩家名称
-	ServerName      string `xorm:"server_name"` //服务器名称
-	BindTime        int64  `xorm:"bind_time"`   //绑定时间
-	SignTime        int64  `xorm:"sign_time"`   //签到时间
-	TotalSign       int    `xorm:"total_sign"`  //累计签到天数
-	Email           string `xorm:"email"`       //邮箱
-}
-
-func (t *UserModel) TableName() string {
-	return "user"
-}

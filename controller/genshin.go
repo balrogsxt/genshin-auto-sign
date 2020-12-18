@@ -4,14 +4,21 @@ import (
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/api"
 	"github.com/balrogsxt/genshin-auto-sign/app"
+	"github.com/balrogsxt/genshin-auto-sign/app/model"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
 	"github.com/balrogsxt/genshin-auto-sign/helper/log"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var bindCd map[int64]int64 //绑定冷却
+func init() {
+	bindCd = make(map[int64]int64, 0)
+}
 
 //登录QQ
 func Login(c *gin.Context) {
@@ -46,7 +53,7 @@ func LoginVerify(c *gin.Context) {
 	}
 	openid := _openid.OpenId
 
-	um := app.UserModel{}
+	um := model.User{}
 	var userId int
 	//验证是否注册过账户
 	has, err := app.GetDb().Where("openid = ?", openid).Get(&um)
@@ -57,7 +64,7 @@ func LoginVerify(c *gin.Context) {
 		}
 
 		//账户未注册,先注册
-		userModel := new(app.UserModel)
+		userModel := new(model.User)
 		userModel.OpenId = openid
 		userModel.CreateTime = time.Now().Unix()
 		_, err := app.GetDb().Insert(userModel)
@@ -97,23 +104,33 @@ func LoginVerify(c *gin.Context) {
 func GetInfo(c *gin.Context) {
 
 	userid := c.GetInt64("userid")
-	//openid := c.GetString("openid")
-	um := app.UserModel{}
-	app.GetDb().Where("id = ?", userid).Get(&um)
 
-	isBind := false
-	if len(um.MihoyoAccountId) > 0 && len(um.MihoyoWebToken) > 0 {
-		isBind = true
+	pl := []model.Player{}
+	if err := app.GetDb().Where("uid = ?", userid).Find(&pl); err != nil {
+		app.NewException("获取绑定角色列表失败...")
 	}
 
-	//判断今日是否签到
-	isSign := false
-	time.Now().Format("2006-01-02")
-	t, _ := time.ParseInLocation("2006-01-02", time.Now().Format("2006-01-02"), time.Local)
-	if um.SignTime >= t.Unix() {
-		isSign = true
-		//如果今日已签到的情况下,直接进入redis缓存!
+	um := model.User{}
+	app.GetDb().Where("id = ?", userid).Get(&um)
 
+	playerList := make([]gin.H, 0)
+	t, _ := time.ParseInLocation("2006-01-02", time.Now().Format("2006-01-02"), time.Local)
+	for _, p := range pl {
+		isSign := false
+		if p.SignTime >= t.Unix() {
+			isSign = true
+		}
+
+		playerList = append(playerList, gin.H{
+			"id":         p.Pid,
+			"serverName": p.ServerName,                                           //服务器名称
+			"playerId":   p.PlayerId,                                             //玩家ID
+			"playerName": p.PlayerName,                                           //玩家名称
+			"signTime":   p.SignTime,                                             //签到时间
+			"bindTime":   time.Unix(p.BindTime, 0).Format("2006-01-02 15:04:05"), //绑定时间
+			"isSign":     isSign,                                                 //今日是否签到
+			"totalSign":  p.TotalSign,                                            //累计签到天数
+		})
 	}
 
 	//直接返回这个用户的个人信息
@@ -122,20 +139,9 @@ func GetInfo(c *gin.Context) {
 		"msg":    "ok",
 		"data": gin.H{
 			//返回用户部分基础数据
-			"id":    um.Id,
-			"email": um.Email,
-			//绑定的游戏角色
-			"isBind": isBind, //是否绑定过用户
-			"bindPlayer": gin.H{
-				"serverName": um.ServerName,                                           //所在服务器
-				"playerName": um.PlayerName,                                           //玩家名称
-				"playerUId":  um.PlayerUid,                                            //玩家UId
-				"bindTime":   time.Unix(um.BindTime, 0).Format("2006-01-02 15:04:05"), //绑定时间
-				"signTime":   time.Unix(um.SignTime, 0).Format("2006-01-02 15:04:05"), //上次签到时间
-				"st":         um.SignTime,
-				"isSign":     isSign,
-				"totalSign":  um.TotalSign, //累计签到天数
-			},
+			"id":         um.Id,
+			"email":      um.Email,
+			"bindPlayer": playerList,
 		},
 	})
 }
@@ -171,7 +177,7 @@ func BindEmail(c *gin.Context) {
 
 	userid := c.GetInt64("userid")
 
-	um := new(app.UserModel)
+	um := new(model.User)
 	um.Email = email
 	//邮箱允许重复
 	if _, err := app.GetDb().
@@ -190,36 +196,27 @@ func BindEmail(c *gin.Context) {
 //取消绑定
 func UnBindPlayer(c *gin.Context) {
 	userid := c.GetInt64("userid")
-
-	umm := app.UserModel{}
-	app.GetDb().Where("id = ?", userid).Get(&umm)
-
-	if len(umm.MihoyoAccountId) == 0 {
-		app.NewException("当前账号还未绑定米游社!")
+	_pid := c.PostForm("pid")
+	pid, err := strconv.ParseInt(_pid, 10, 64)
+	if err != nil {
+		app.NewException("参数错误")
+	}
+	has, err := app.GetDb().Where("id = ? and uid = ?", pid, userid).Exist(&model.Player{})
+	if err != nil {
+		log.Info("[解除绑定]查询角色失败: %s", err.Error())
+		app.NewException("系统错误,请稍后再试!")
+	}
+	if !has {
+		app.NewException("没有找到这个角色,无法解除绑定!")
 	}
 
-	um := new(app.UserModel)
-	um.MihoyoWebToken = ""
-	um.MihoyoAccountId = ""
-	um.ServerName = ""
-	um.PlayerUid = ""
-	um.PlayerName = ""
-	um.BindTime = 0
-	//修改数据库
-
 	if _, err := app.GetDb().
-		Cols("account_id", "web_token",
-			"player_name", "server_name", "player_id", "bind_time",
-		).
-		Where("id = ?", userid).
-		Update(um); err != nil {
+		Where("id = ? and uid = ?", pid, userid).
+		Delete(&model.Player{}); err != nil {
 		log.Info("取消绑定失败:", err.Error())
 		app.NewException("取消绑定失败,系统错误!")
 	}
 
-	t := time.Now().Format("2006-01-02 15:04:05")
-	msg := fmt.Sprintf("[%s] -> 来自【%s】的旅行者“%s”(%s) 已经解除米游社账户的绑定! \n", t, umm.ServerName, umm.PlayerName, umm.PlayerUid)
-	log.Info(msg)
 	c.JSON(200, gin.H{
 		"status": 0,
 		"msg":    "取消绑定成功",
@@ -228,7 +225,6 @@ func UnBindPlayer(c *gin.Context) {
 
 //绑定角色
 func BindPlayer(c *gin.Context) {
-
 	accountId := c.PostForm("accountId")
 	cookieToken := c.PostForm("cookieToken")
 
@@ -238,111 +234,93 @@ func BindPlayer(c *gin.Context) {
 	}
 	userid := c.GetInt64("userid")
 
-	umm := app.UserModel{}
-	app.GetDb().Where("id = ?", userid).Get(&umm)
-
-	//绑定间隔不能少于5秒
-	if umm.BindTime+5 > time.Now().Unix() {
-		app.NewException("绑定过于频繁,请稍后再试!")
+	userCd, has := bindCd[userid]
+	if has {
+		if userCd+5 > time.Now().Unix() {
+			app.NewException("绑定过于频繁,请稍后再试!")
+		}
 	}
 
 	genshin := api.NewGenshinApi()
 	cookie := fmt.Sprintf("account_id=%s;cookie_token=%s", accountId, cookieToken)
 
-	player, _, err := genshin.GetPlayerInfo(cookie)
+	players, _, err := genshin.GetPlayerInfo(cookie)
 	if err != nil {
 		app.NewException(fmt.Sprintf("获取游戏角色失败:%s", err.Error()))
 	}
 
-	um := new(app.UserModel)
+	if len(players) == 0 {
+		app.NewException("当前米游社账户可能暂未绑定任何游戏角色!!!")
+	}
+	bindPlayerList := make([]gin.H, 0)
+
+	db := app.GetDb().NewSession()
+
+	//防止滥用,绑定的时候移除当前账号下绑定的重新设置
+	if _, err := db.Where("uid = ?", userid).Delete(&model.Player{}); err != nil {
+		log.Info("删除已绑定的失败: %s", err.Error())
+		app.NewException("绑定操作失败,系统异常")
+	}
+	//绑定到当前用户
+	for _, player := range players {
+		newPlayer := new(model.Player)
+		newPlayer.Uid = userid
+		newPlayer.PlayerName = player.NickName
+		newPlayer.ServerRegion = player.Region
+		newPlayer.ServerName = player.ServerName
+		newPlayer.BindTime = time.Now().Unix()
+		newPlayer.PlayerId = player.GameUid
+
+		if _, err := db.Insert(newPlayer); err == nil {
+			bindPlayerList = append(bindPlayerList, gin.H{
+				"player_id":   player.GameUid,
+				"player_name": player.NickName,
+				"server_name": player.ServerName,
+			})
+		}
+	}
+	if len(bindPlayerList) == 0 {
+		app.NewException("绑定失败:没有绑定成功任何游戏角色...")
+	}
+
+	um := new(model.User)
 	um.MihoyoWebToken = cookieToken
 	um.MihoyoAccountId = accountId
-	um.ServerName = player.ServerName
-	um.PlayerUid = player.GameUid
-	um.PlayerName = player.NickName
-	um.BindTime = time.Now().Unix()
-	//修改数据库
 
-	if _, err := app.GetDb().
-		Cols("account_id", "web_token",
-			"player_name", "server_name", "player_id", "bind_time",
-		).
+	if _, err := db.
+		Cols("account_id", "web_token").
 		Where("id = ?", userid).
 		Update(um); err != nil {
+
+		db.Rollback()
 		log.Info("绑定失败:", err.Error())
 		app.NewException("绑定失败,系统错误!")
+
+	} else {
+		db.Commit()
 	}
+	bindCd[userid] = time.Now().Unix()
+
 	//绑定成功后,直接调用一次接口
-	go func(player *api.GenshinPlayer) {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Info("运行及时签到失败: %#v", err)
-			}
-		}()
-		signStatus, _, err := genshin.RunSign(player.GameUid, cookie)
-		isUpdate := false
-		isNotifySign := false
-		if signStatus == 0 {
-			//log.Info(player.NickName,":今日签到成功")
-			isUpdate = true
-			isNotifySign = true
-		} else if signStatus == 1 {
-			//log.Info(player.NickName,":今日已签到,无需重复签到")
-			isUpdate = true
-		} else {
-			log.Info(player.NickName, ":绑定签到运行失败", err)
+	title := "【游戏角色绑定成功】"
+	notifyMsg := title
+	for _, item := range bindPlayerList {
+		notifyMsg += fmt.Sprintf("\n[%s]%s(%s)", item["server_name"], item["player_name"], item["player_id"])
+	}
+	if title != notifyMsg {
+		//发送绑定通知到群内
+		bot := api.GetQQBot()
+		for _, g := range helper.GetConfig().QQBot.BindNotifyGroup {
+			bot.SendMessage(g, []string{
+				notifyMsg,
+			})
 		}
-
-		//更新数据库为签到时间
-		if isUpdate {
-			info, err := genshin.GetPlayerSignInfo(player.GameUid, cookie)
-			if err == nil {
-				um := new(app.UserModel)
-				um.SignTime = time.Now().Unix()
-				um.TotalSign = info.TotalSignDay
-				//修改数据库
-
-				if _, err := app.GetDb().
-					Cols("sign_time", "total_sign").
-					Where("id = ?", userid).
-					Update(um); err != nil {
-					log.Info("更新数据失败:", err.Error())
-				} else {
-					if isNotifySign {
-						bot := api.GetQQBot()
-						notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
-						notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", info.TotalSignDay, player.NickName, player.GameUid)
-
-						for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
-							bot.SendMessage(g, []string{
-								notifyMsg,
-							})
-						}
-					}
-				}
-			}
-		}
-	}(player)
-
-	t := time.Now().Format("2006-01-02 15:04:05")
-	msg := fmt.Sprintf("[%s] -> 来自【%s】的旅行者“%s”(%s) 绑定自动签到成功! \n", t, player.ServerName, player.NickName, player.GameUid)
-
-	//发送绑定通知到群内
-	bot := api.GetQQBot()
-	for _, g := range helper.GetConfig().QQBot.BindNotifyGroup {
-		bot.SendMessage(g, []string{
-			msg,
-		})
 	}
 
 	c.JSON(200, gin.H{
 		"status": 0,
 		"msg":    "绑定成功",
-		"data": gin.H{
-			"serverName": player.ServerName,
-			"playerUid":  player.GameUid,
-			"playerName": player.NickName,
-		},
+		"data":   bindPlayerList,
 	})
 
 }

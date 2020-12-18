@@ -22,7 +22,15 @@ type Config struct {
 	NewUser          bool     `yaml:"new_user"`           //是否允许新用户使用
 	CurlApi          []string `yaml:"curl_api"`           //远程请求API
 	Task             []string `yaml:"task"`               //任务corn触发时间
-	QQOauth          struct {
+	Smtp             struct {
+		Enable   bool   //是否启用
+		Host     string //邮件服务器地址
+		Port     int    //邮件服务器端口
+		User     string //用户
+		Password string //密码
+		From     string //别名来源
+	}
+	QQOauth struct {
 		ClientId     string `yaml:"client_id"`
 		ClientSecret string `yaml:"client_secret"`
 		RedirectUri  string `yaml:"redirect_uri"`

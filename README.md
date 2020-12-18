@@ -1,7 +1,7 @@
 # 原神米游社自动签到小工具-服务端API
 
 ## 在线食用
-[https://genshin.acgxt.com](https://genshin.acgxt.com)
+[https://genshin.acgxt.com](https://genshin.acgxt.com) 【在线食用的可能与开源提交的代码可能存在版本不同情况(一般是在线版测试稳定后再进行提交代码】
 
 ## 简介
 本项目主要是服务端API功能,网页方面需要自行实现或copy上面在线地址~,该项目用于处理米游社原神版块每日签到自动化处理功能,需要玩家提供米游社account_id与cookie_token实现,为了防止滥用,每一个QQ账号只允许绑定一个米游社账户
@@ -32,6 +32,14 @@ mysql:
     name: 数据库名称
     user: 用户名
     password: 密码
+#smtp邮件配置
+smtp:
+  enable: true #是否启用
+  host: smtp.xxxxx.com
+  port: 25
+  user: xxx@xxx.com
+  password: xxxxxx
+  from: 原神签到通知
 #redis配置
 redis:
     host: 127.0.0.1
@@ -65,22 +73,33 @@ task:
   - 10 0 0 * * *   #每日凌晨0点0分第十秒触发
   - 0 */5 * * * *  #每5分钟触发一次
 ```
-> mysql数据库配置,就一张表 `user`
+> mysql数据库配置
 ```
+//用户信息表
 CREATE TABLE `user` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `openid` varchar(60) NOT NULL COMMENT 'openid',
   `account_id` varchar(50) DEFAULT NULL,
   `web_token` varchar(255) DEFAULT NULL,
   `create_time` int(10) DEFAULT NULL,
-  `player_name` varchar(50) DEFAULT NULL,
-  `server_name` varchar(50) DEFAULT NULL,
-  `player_id` varchar(50) DEFAULT NULL,
-  `bind_time` int(10) DEFAULT NULL COMMENT '绑定时间',
-  `sign_time` int(10) DEFAULT '0' COMMENT '上一次签到事件',
-  `total_sign` int(10) DEFAULT NULL COMMENT '累计签到天数',
+  `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
   PRIMARY KEY (`id`),
   UNIQUE KEY `openid` (`openid`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+```
+```
+//多角色绑定表
+CREATE TABLE `player` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `uid` int(10) DEFAULT NULL COMMENT '用户ID',
+  `server_region` varchar(10) DEFAULT NULL COMMENT '服务器标识',
+  `server_name` varchar(10) DEFAULT NULL COMMENT '服务器名称',
+  `player_name` varchar(50) DEFAULT NULL COMMENT '玩家名称',
+  `player_id` varchar(20) DEFAULT NULL COMMENT '玩家UID',
+  `bind_time` int(10) DEFAULT '0' COMMENT '绑定时间',
+  `sign_time` int(10) DEFAULT '0' COMMENT '签到时间',
+  `total_sign` int(10) DEFAULT '0' COMMENT '签到次数',
+  PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 ```
 ## 服务端API(简略版)
@@ -106,12 +125,16 @@ CREATE TABLE `user` (
 无参数
 
 > `POST` /bind 绑定米游社账户
-> `POST` /unbind 解除绑定
-
 |参数名|类型|说明|
 |:----:|:----|----:|
 |accountId|string|米游社accountid|
 |cookieToken|string|米游社cookietoken|
+> `POST` /unbind 解除绑定
+|参数名|类型|说明|
+|:----:|:----|----:|
+|pid|int|角色ID|
+
+
 
 ## 本地编译&启动
 ```

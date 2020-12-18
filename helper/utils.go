@@ -3,7 +3,9 @@ package helper
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	jsoniter "github.com/json-iterator/go"
+	"gopkg.in/gomail.v2"
 )
 
 var jsonConfig = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -24,25 +26,19 @@ func Md5(str string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
-//send mail
-func SendEmail(targetEmail string, text string) {
-	//host := ""
-	//user := ""
-	//password := ""
+func SendEmail(to string, title string, body string) error {
+	conf := GetConfig().Smtp
+	if conf.Enable {
+		m := gomail.NewMessage(gomail.SetCharset("utf-8"))
+		m.SetHeader("From", m.FormatAddress(conf.User, conf.From))
+		m.SetHeader("To", to)
+		m.SetHeader("Subject", title)
+		m.SetBody("text/html", body)
+		d := gomail.NewDialer(conf.Host, conf.Port, conf.User, conf.Password)
+		err := d.DialAndSend(m)
+		return err
+	} else {
+		return errors.New("当前服务端未启用邮件发送")
+	}
 
-	// todo 后续增加发送邮件通知功能
-	//intln("send mail....")
-	//auth := smtp.PlainAuth("", user, password, host)
-	//msg := []byte("测试")
-	//
-	//to := []string{
-	//	"",
-	//}
-	//
-	//err := smtp.SendMail(host, auth, user, to, msg)
-	//if err != nil {
-	//	log.Info("err->", err)
-	//} else {
-	//	log.Info("ok")
-	//}
 }

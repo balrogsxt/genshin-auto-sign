@@ -4,10 +4,19 @@ import (
 	"fmt"
 	"github.com/balrogsxt/genshin-auto-sign/api"
 	"github.com/balrogsxt/genshin-auto-sign/app"
+	"github.com/balrogsxt/genshin-auto-sign/app/model"
 	"github.com/balrogsxt/genshin-auto-sign/helper"
 	"github.com/balrogsxt/genshin-auto-sign/helper/log"
+	"strings"
 	"time"
 )
+
+type PlayerSignInfo struct {
+	ServerName string //服务器名称
+	PlayerName string //玩家名称
+	PlayerUid  string //玩家UId
+	TotalSign  int    //签到天数
+}
 
 //每日签到任务
 func RunSignTask(isFirst bool) {
@@ -22,139 +31,117 @@ func RunSignTask(isFirst bool) {
 	if his == "00:00" && !isFirst {
 		return
 	}
-	if isFirst {
-		log.Info("[主要任务计划]", time.Now().Format("2006-01-02 15:04:05"))
-	}
+	playerList := []model.PlayerSign{}
 
-	playerList := []app.UserModel{}
-
-	err := app.GetDb().Where("account_id != '' and web_token != '' and sign_time < ?", t.Unix()).Find(&playerList)
-	if err != nil {
-		log.Info("查询失败: %s", err.Error())
+	if err := app.GetDb().
+		Where("sign_time < ? ", t.Unix()).
+		Join("INNER", "user", "user.id=player.uid").
+		Cols("player.*", "user.account_id", "user.web_token", "user.email").
+		Find(&playerList); err != nil {
+		log.Info("查询需要签到的角色列表失败: %s", err.Error())
 		return
 	}
-	signOkList := []app.UserModel{}
+	if 0 >= len(playerList) {
+		return
+	}
+	//签到成功的游戏玩家列表
+	signList := []PlayerSignInfo{}
+
+	runCount := 1 //可以执行的次数
+	if isFirst {
+		runCount = 3 //如果是每日凌晨0点则可以执行3次
+	}
 
 	genshin := api.NewGenshinApi()
-	// todo 已知问题:用户过多后会导致api调用失败
+	expireUser := make([]int64, 0)
+
 	//每次运行执行
-	for _, item := range playerList {
-		status := func(item *app.UserModel, isFirst bool) int {
-			max := 1
-			if isFirst {
-				max = 3 //每日首次处理允许3次容错率
+	for _, player := range playerList {
+		log.Info("")
+		log.Info("[%s]%s(%s)-----------------------------", player.ServerName, player.PlayerName, player.PlayerId)
+		//检测是否过期的账号
+		isExpire := false
+		for _, uid := range expireUser {
+			if uid == player.Uid {
+				isExpire = true
+				break
 			}
-
-			defer func() {
-				if err := recover(); err != nil {
-					log.Info("用户ID: %#v -> 签到意外错误: %s", item.Id, err)
-				}
-			}()
-
-			cookie := fmt.Sprintf("account_id=%s;cookie_token=%s", item.MihoyoAccountId, item.MihoyoWebToken)
-			isRs := false
-			for i := 0; i < max; i++ {
-				if i >= 1 {
-					time.Sleep(time.Second * 2) //如果出现错误一次则会延迟2秒执行
-				}
-				player, state, err := genshin.GetPlayerInfo(cookie)
-				if state != 0 {
-					log.Info("用户ID: %#v -> 获取米游社签到信息失败: %s", item.Id, err.Error())
-					if state == -100 {
-						//登录失效,清空cookie
-						go func(item *app.UserModel) {
-							//发送邮箱给玩家失效
-							um := new(app.UserModel)
-							um.MihoyoAccountId = ""
-							um.MihoyoWebToken = ""
-							um.ServerName = ""
-							um.PlayerName = ""
-							um.PlayerUid = ""
-							um.BindTime = 0
-							um.SignTime = 0
-							um.TotalSign = 0
-							if _, err := app.GetDb().Where("id = ?", item.Id).Cols("sign_time", "bind_time", "player_id", "player_name", "server_name", "total_sign", "account_id", "web_token").Update(um); err != nil {
-								log.Info("更新过期数据失败: ", err.Error())
-							}
-							CookieExpireNotify(item)
-						}(item)
-					}
-					continue
-				}
-				signInfo, err := genshin.GetPlayerSignInfo(player.GameUid, cookie)
-				if err != nil {
-					log.Info("%d -> 获取米游社签到信息失败: %s", item.Id, err.Error())
-					continue
-				}
-				if !signInfo.IsSign {
-					//if true {
-					//未签到
-					status, isRemote, err := genshin.RunSign(player.GameUid, cookie)
-					if status == 0 {
-						//签到成功
-						signInfo.TotalSignDay += 1
-						item.TotalSign = signInfo.TotalSignDay
-						log.Info("[%s]%s(%s) 用户ID: %#v -> 签到成功 -> 当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, item.Id, signInfo.TotalSignDay)
-					} else if status == 1 {
-						//今日已签到
-						item.TotalSign = signInfo.TotalSignDay
-						log.Info("[%s]%s(%s) 用户ID:%#v -> 已经签到 -> 当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, item.Id, signInfo.TotalSignDay)
-					} else {
-						//签到失败
-						log.Info("[签到失败] 用户ID:%#v -> 状态: %#v -> 错误信息: %#v ", item.Id, status, err)
-
-						if isRemote && isRs == false {
-							//远程执行的话,再运行一次接口
-							max += 1
-							isRs = true
-							continue
-						}
-						//if status == 500 {
-						//	//超时频繁,直接结束此次任务,放到下一次任务计划执行
-						//	return 2
-						//}
-
-						continue
-					}
-				} else {
-					item.TotalSign = signInfo.TotalSignDay
-					log.Info("[%s]%s(%s) 已经签到->当前累计签到%d天", player.ServerName, player.NickName, player.GameUid, signInfo.TotalSignDay)
-				}
-
-				//设置签到时间、累计天数
-				um := new(app.UserModel)
-				um.SignTime = time.Now().Unix()
-				um.TotalSign = signInfo.TotalSignDay
-				if _, err := app.GetDb().Where("id = ?", item.Id).Cols("sign_time", "total_sign").Update(um); err != nil {
-					log.Info("更新签到信息失败: ", err.Error())
-					continue
-				}
-				return 0 //签到成功了
-			}
-			return 1 //执行失败了
-		}(&item, isFirst)
-
-		if status == 0 {
-			signOkList = append(signOkList, item)
 		}
-		//else if status == 2 {
-		//	//终结任务
-		//	log.Info("[任务停止]检测到服务器请求过于频繁,本次任务终止,下一次任务计划继续执行!")
-		//	break
-		//}
-		time.Sleep(time.Millisecond * 100)
+		if isExpire {
+			continue
+		}
 
+		//组装必要cookie
+		cookie := fmt.Sprintf("account_id=%s;cookie_token=%s", player.MihoyoAccountId, player.MihoyoWebToken)
+		isErrRun := false
+		for i := 0; i < runCount; i++ {
+			//1.获取签到信息
+			signInfo, retcode, err := genshin.GetPlayerSignInfo(&player, cookie)
+			if err != nil {
+				log.Info("[状态码: %d ] 获取米游社签到信息失败: %s", retcode, err.Error())
+
+				if retcode == -100 {
+					//登录失效,更新数据,通知用户
+					expireUser = append(expireUser, player.Uid)
+					go CookieExpireNotify(&player)
+					break
+				}
+				continue
+			}
+			//2.没有签到则进行签到操作
+			if !signInfo.IsSign {
+				status, isRemote, err := genshin.RunSign(&player, cookie)
+				if status == 0 {
+					//签到成功
+					signInfo.TotalSignDay += 1
+					log.Info("[ %d ] -> [%s]%s(%s) 今日签到成功 -> 当前累计签到%d天", player.Uid, player.ServerName, player.PlayerName, player.PlayerId, signInfo.TotalSignDay)
+				} else if status == 1 {
+					//今日已签到
+					log.Info("[ %d ] -> [%s]%s(%s) 请勿重复签到 -> 当前累计签到%d天", player.Uid, player.ServerName, player.PlayerName, player.PlayerId, signInfo.TotalSignDay)
+				} else {
+					//签到失败
+					log.Info("[ %d ] -> [%s]%s(%s) 签到发生错误 -> 状态码: %v -> 错误信息: %s", player.Uid, player.ServerName, player.PlayerName, player.PlayerId, signInfo.TotalSignDay, status, err.Error())
+
+					if isRemote && isErrRun == false {
+						//允许重新执行一次
+						runCount += 1
+						isErrRun = true
+					}
+
+					continue
+				}
+			} else {
+				log.Info("[ %d ] -> [%s]%s(%s) 请勿重复签到 -> 当前累计签到%d天", player.Uid, player.ServerName, player.PlayerName, player.PlayerId, signInfo.TotalSignDay)
+			}
+
+			//3.保存签到信息
+			signPlayerSave := new(model.Player)
+			signPlayerSave.TotalSign = signInfo.TotalSignDay
+			signPlayerSave.SignTime = time.Now().Unix()
+			if _, err := app.GetDb().Where("id = ?", player.Pid).
+				Cols("total_sign", "sign_time").
+				Update(signPlayerSave); err != nil {
+				log.Info("更新签到信息失败: %s", err.Error())
+				continue
+			}
+
+			signList = append(signList, PlayerSignInfo{
+				PlayerUid:  player.PlayerId,
+				PlayerName: player.PlayerName,
+				ServerName: player.ServerName,
+				TotalSign:  signInfo.TotalSignDay,
+			})
+			break
+		}
 	}
-
-	if isFirst {
-		log.Info("[主要任务计划执行结束]", time.Now().Format("2006-01-02 15:04:05"))
-	}
-
-	if len(signOkList) > 0 {
+	log.Info("")
+	if len(signList) > 0 {
+		log.Info("本次签到完成,累计: %d 人完成签到!", len(signList))
 		notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
-		for _, item := range signOkList {
+		for _, item := range signList {
 			notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", item.TotalSign, item.PlayerName, item.PlayerUid)
 		}
+		fmt.Println(notifyMsg)
 		//发送签到通知到群内
 		bot := api.GetQQBot()
 		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
@@ -166,14 +153,72 @@ func RunSignTask(isFirst bool) {
 }
 
 //Cookie过期通知群组与邮箱
-func CookieExpireNotify(player *app.UserModel) {
-	//发送签到通知到群内
-	bot := api.GetQQBot()
-	for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
-		bot.SendMessage(g, []string{
-			fmt.Sprintf("【%s】%s(%s)的绑定已过期,请及时重新绑定!", player.ServerName, player.PlayerUid, player.PlayerName),
-		})
+func CookieExpireNotify(player *model.PlayerSign) bool {
+	fmt.Println("过期处理")
+	//1.删除cookie信息
+	db := app.GetDb().NewSession()
+
+	db.Begin()
+
+	playerList := []model.PlayerSign{}
+	if err := db.
+		Where("uid = ?", player.Uid).
+		Join("INNER", "user", "user.id=player.uid").
+		Cols("player.*", "user.account_id", "user.web_token", "user.email").
+		Find(&playerList); err != nil {
+		log.Info("获取过期用户绑定的角色列表失败: %s", err.Error())
+		db.Rollback()
+		return false
+	}
+	if len(playerList) == 0 {
+		//没有可以删除的角色
+		db.Rollback()
+		return true
 	}
 
-	//helper.SendEmail(player.Email,"阁下的自动签到部署Cookie已过期,请重新部署设置!")
+	u := new(model.User)
+	if _, err := db.Where("id = ?", player.Uid).Cols("account_id", "web_token").Update(u); err != nil {
+		db.Rollback()
+		log.Info("删除过期用户的Cookie信息失败: %s", err.Error())
+		return false
+	}
+	//2.删除账户下的绑定角色
+	if _, err := db.Where("uid = ?", player.Uid).Delete(&model.Player{}); err != nil {
+		db.Rollback()
+		log.Info("删除过期用户下绑定的玩家角色失败: %s", err.Error())
+		return false
+	}
+	db.Commit()
+	db.Rollback()
+	//3.发送通知相关
+	notifyMsg := "【绑定已失效,请及时更换绑定】"
+	for _, p := range playerList {
+		notifyMsg += fmt.Sprintf("\n[%s]%s(%s)", p.ServerName, p.PlayerName, p.PlayerId)
+	}
+	log.Info(notifyMsg)
+	go func() {
+		//发送签到通知到群内
+		bot := api.GetQQBot()
+		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
+			bot.SendMessage(g, []string{
+				notifyMsg,
+			})
+		}
+		//发送邮件
+		if helper.IsEmail(player.Email) {
+
+			title := "阁下绑定的米游社账户已过期!"
+			err := helper.SendEmail(player.Email, title, strings.ReplaceAll(notifyMsg, "\n", "<br/>"))
+			if err == nil {
+				log.Info("过期用户邮件通知成功 -> %s", player.Email)
+			} else {
+				log.Info("过期用户邮件通知失败: 地址: %s -> %s", player.Email, err.Error())
+			}
+		} else {
+			log.Info("该用户未设置邮箱,无法绑定!")
+		}
+		//发送tg订阅推送
+
+	}()
+	return true
 }
