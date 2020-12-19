@@ -14,7 +14,7 @@ import (
 	"net/http"
 )
 
-const Version = "1.0.3"
+const Version = "1.0.4"
 
 var _cron *cron.Cron
 

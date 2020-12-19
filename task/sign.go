@@ -78,12 +78,12 @@ func RunSignTask(isFirst bool) {
 			//1.获取签到信息
 			signInfo, retcode, err := genshin.GetPlayerSignInfo(&player, cookie)
 			if err != nil {
-				log.Info("[状态码: %d ] 获取米游社签到信息失败: %s", retcode, err.Error())
+				log.Info("[ %d ] -> [状态码: %d ] 获取米游社签到信息失败: %s", player.Uid, retcode, err.Error())
 
 				if retcode == -100 {
 					//登录失效,更新数据,通知用户
 					expireUser = append(expireUser, player.Uid)
-					go CookieExpireNotify(&player)
+					go CookieExpireNotify(player)
 					break
 				}
 				continue
@@ -153,8 +153,8 @@ func RunSignTask(isFirst bool) {
 }
 
 //Cookie过期通知群组与邮箱
-func CookieExpireNotify(player *model.PlayerSign) bool {
-	fmt.Println("过期处理")
+func CookieExpireNotify(player model.PlayerSign) bool {
+	log.Info("【用户过期处理】 [%s]%s(%s)", player.ServerName, player.PlayerName, player.PlayerId)
 	//1.删除cookie信息
 	db := app.GetDb().NewSession()
 
@@ -206,7 +206,6 @@ func CookieExpireNotify(player *model.PlayerSign) bool {
 		}
 		//发送邮件
 		if helper.IsEmail(player.Email) {
-
 			title := "阁下绑定的米游社账户已过期!"
 			err := helper.SendEmail(player.Email, title, strings.ReplaceAll(notifyMsg, "\n", "<br/>"))
 			if err == nil {
