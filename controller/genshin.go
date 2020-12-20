@@ -201,7 +201,8 @@ func UnBindPlayer(c *gin.Context) {
 	if err != nil {
 		app.NewException("参数错误")
 	}
-	has, err := app.GetDb().Where("id = ? and uid = ?", pid, userid).Exist(&model.Player{})
+	p := model.Player{}
+	has, err := app.GetDb().Where("id = ? and uid = ?", pid, userid).Get(&p)
 	if err != nil {
 		log.Info("[解除绑定]查询角色失败: %s", err.Error())
 		app.NewException("系统错误,请稍后再试!")
@@ -216,6 +217,7 @@ func UnBindPlayer(c *gin.Context) {
 		log.Info("取消绑定失败:", err.Error())
 		app.NewException("取消绑定失败,系统错误!")
 	}
+	log.Info("[解除绑定] [%s]%s(%s)", p.ServerName, p.PlayerName, p.PlayerId)
 
 	c.JSON(200, gin.H{
 		"status": 0,
@@ -263,6 +265,13 @@ func BindPlayer(c *gin.Context) {
 	}
 	//绑定到当前用户
 	for _, player := range players {
+
+		signInfo, status, err := genshin.GetPlayerSignInfo(player.Region, player.GameUid, cookie)
+		if err != nil {
+			log.Info("[绑定角色] [%s]%s(%s) -> 状态码: %d -> 获取签到信息失败: %s", player.ServerName, player.NickName, player.GameUid, status, err.Error())
+			continue
+		}
+
 		newPlayer := new(model.Player)
 		newPlayer.Uid = userid
 		newPlayer.PlayerName = player.NickName
@@ -270,6 +279,10 @@ func BindPlayer(c *gin.Context) {
 		newPlayer.ServerName = player.ServerName
 		newPlayer.BindTime = time.Now().Unix()
 		newPlayer.PlayerId = player.GameUid
+		newPlayer.TotalSign = signInfo.TotalSignDay
+		if signInfo.IsSign {
+			newPlayer.SignTime = time.Now().Unix()
+		}
 
 		if _, err := db.Insert(newPlayer); err == nil {
 			bindPlayerList = append(bindPlayerList, gin.H{
@@ -308,6 +321,7 @@ func BindPlayer(c *gin.Context) {
 		notifyMsg += fmt.Sprintf("\n[%s]%s(%s)", item["server_name"], item["player_name"], item["player_id"])
 	}
 	if title != notifyMsg {
+		log.Info(notifyMsg)
 		//发送绑定通知到群内
 		bot := api.GetQQBot()
 		for _, g := range helper.GetConfig().QQBot.BindNotifyGroup {

@@ -60,8 +60,8 @@ func (this *GenshinApi) GetPlayerInfo(cookie string) ([]*GenshinPlayer, int, err
 }
 
 //获取玩家签到信息
-func (this *GenshinApi) GetPlayerSignInfo(player *model.PlayerSign, cookie string) (*GenshinSignInfo, int, error) {
-	uri := fmt.Sprintf("https://api-takumi.mihoyo.com/event/bbs_sign_reward/info?act_id=e202009291139501&region=%s&uid=%s", player.ServerRegion, player.PlayerId)
+func (this *GenshinApi) GetPlayerSignInfo(ServerRegion string, PlayerUid string, cookie string) (*GenshinSignInfo, int, error) {
+	uri := fmt.Sprintf("https://api-takumi.mihoyo.com/event/bbs_sign_reward/info?act_id=%s&region=%s&uid=%s", ActId, ServerRegion, PlayerUid)
 	header := req.Header{
 		"Cookie": cookie,
 	}

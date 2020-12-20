@@ -76,7 +76,7 @@ func RunSignTask(isFirst bool) {
 		isErrRun := false
 		for i := 0; i < runCount; i++ {
 			//1.获取签到信息
-			signInfo, retcode, err := genshin.GetPlayerSignInfo(&player, cookie)
+			signInfo, retcode, err := genshin.GetPlayerSignInfo(player.ServerRegion, player.PlayerId, cookie)
 			if err != nil {
 				log.Info("[ %d ] -> [状态码: %d ] 获取米游社签到信息失败: %s", player.Uid, retcode, err.Error())
 
