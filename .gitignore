@@ -4,3 +4,5 @@ main.exe
 .idea
 bin
 obj
+logs
+*.log
