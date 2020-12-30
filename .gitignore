@@ -1,9 +1,0 @@
-config.yaml
-main
-main.exe
-.idea
-bin
-obj
-logs
-*.log
-/res
