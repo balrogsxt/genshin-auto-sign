@@ -137,17 +137,44 @@ func RunSignTask(isFirst bool) {
 	log.Info("")
 	if len(signList) > 0 {
 		log.Info("本次签到完成,累计: %d 人完成签到!", len(signList))
-		notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
+
+		title := fmt.Sprintf("原神米游社%s签到成功列表", time.Now().Format("2006-01-02"))
+		signListPlayer := make([]string, 0)
+
+		t := time.Now().Format("2006-01-02")
+		notifyMsg := fmt.Sprintf("原神米游社%s签到成功列表", t)
 		for _, item := range signList {
 			notifyMsg += fmt.Sprintf("\n[%d天]%s(%s)", item.TotalSign, item.PlayerName, item.PlayerUid)
+			signListPlayer = append(signListPlayer, fmt.Sprintf("[%d天]%s(%s)", item.TotalSign, item.PlayerName, item.PlayerUid))
 		}
 		fmt.Println(notifyMsg)
-		//发送签到通知到群内
+
+		conf := helper.GetConfig()
+		notifyImage := conf.NotifyImage
+
+		fileName := strings.ReplaceAll(notifyImage.SaveName, "{DATE}", t)
+		savePath := strings.ReplaceAll(notifyImage.SavePath, "{NAME}", fileName)
+		fileUrl := strings.ReplaceAll(notifyImage.DomainUrl, "{NAME}", fileName)
+		//绘制图片
+		err := helper.BuildImage(notifyImage.FontFile, notifyImage.BackgroundFile, title, signListPlayer, savePath)
+
 		bot := api.GetQQBot()
-		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
-			bot.SendMessage(g, []string{
-				notifyMsg,
+		//发送签到通知到群内
+		elemList := make([]map[string]interface{}, 0)
+		if err == nil {
+			elemList = append(elemList, map[string]interface{}{
+				"type": "Image",
+				"url":  fileUrl,
 			})
+		} else {
+			elemList = append(elemList, map[string]interface{}{
+				"type": "Plain",
+				"text": notifyMsg,
+			})
+		}
+
+		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
+			bot.SendGroupMessage(g, elemList)
 		}
 	}
 }
@@ -197,13 +224,8 @@ func CookieExpireNotify(player model.PlayerSign) bool {
 	}
 	log.Info(notifyMsg)
 	go func() {
-		//发送签到通知到群内
-		bot := api.GetQQBot()
-		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
-			bot.SendMessage(g, []string{
-				notifyMsg,
-			})
-		}
+		//判断是否属于qq邮箱
+
 		//发送邮件
 		if helper.IsEmail(player.Email) {
 			title := "阁下绑定的米游社账户已过期!"
@@ -216,8 +238,28 @@ func CookieExpireNotify(player model.PlayerSign) bool {
 		} else {
 			log.Info("该用户未设置邮箱,无法绑定!")
 		}
-		//发送tg订阅推送
+		at := ""
+		if helper.IsQQEmail(player.Email) {
+			at = strings.ReplaceAll(player.Email, "@qq.com", "")
+		}
 
+		//发送签到通知到群内
+		bot := api.GetQQBot()
+		for _, g := range helper.GetConfig().QQBot.SignNotifyGroup {
+			elem := make([]map[string]interface{}, 0)
+			elem = append(elem, map[string]interface{}{
+				"type": "Plain",
+				"text": notifyMsg,
+			})
+			if len(at) > 0 {
+				elem = append(elem, map[string]interface{}{
+					"type":    "At",
+					"target":  at,
+					"display": fmt.Sprintf("@%s", player.PlayerName),
+				})
+			}
+			bot.SendGroupMessage(g, elem)
+		}
 	}()
 	return true
 }

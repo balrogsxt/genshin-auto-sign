@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	AppVersion = "2.1.0"
-	ClientType = "5"
-	Referer    = "https://webstatic.mihoyo.com/bbs/event/signin-ys/index.html"
-	UserAgent  = "Mozilla/5.0 (Linux; Android 5.1.1; f103 Build/LYZ28N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/52.0.2743.100 Safari/537.36 miHoYoBBS/" + AppVersion
-	ActId      = "e202009291139501"
+	AppVersion       = "2.2.1"
+	UserAgentVersion = "2.3.0"
+	ClientType       = "5"
+	Referer          = "https://webstatic.mihoyo.com/bbs/event/signin-ys/index.html"
+	UserAgent        = "Mozilla/5.0 (iPad; CPU OS 13_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) miHoYoBBS/2.3.0" + UserAgentVersion
+	ActId            = "e202009291139501"
 )
 
 type GenshinApi struct {
@@ -200,7 +201,7 @@ func getDs() string {
 	t := time.Now().Unix()
 	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(999999)
-	ms := fmt.Sprintf("salt=%s&t=%d&r=%d", helper.Md5(AppVersion), t, r)
+	ms := fmt.Sprintf("salt=cx2y9z9a29tfqvr1qsq6c7yz99b5jsqt&t=%d&r=%d", t, r)
 	md5 := helper.Md5(ms)
 	return fmt.Sprintf("%d,%d,%s", t, r, md5)
 }

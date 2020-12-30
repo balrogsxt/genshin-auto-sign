@@ -60,7 +60,14 @@ func LoginVerify(c *gin.Context) {
 	if has == false {
 		conf := helper.GetConfig()
 		if conf.NewUser == false {
-			app.NewException("当前暂未开放新用户使用...(以前登录过的用户可正常使用)")
+			NoRegisterText := conf.NoRegisterText
+			if len(conf.NoRegisterText) == 0 {
+				NoRegisterText = "当前暂未开放新用户使用...(以前登录过的用户可正常使用)"
+			}
+
+			log.Info("[新用户尝试注册被挡] OpenId: %s -> ", openid, NoRegisterText)
+
+			app.NewException(NoRegisterText)
 		}
 
 		//账户未注册,先注册
@@ -72,6 +79,8 @@ func LoginVerify(c *gin.Context) {
 			log.Info("注册失败:", err.Error())
 			app.NewException("账户注册失败...请稍后再试!")
 		}
+		log.Info("[新用户注册成功] OpenId: %s -> ", openid)
+
 		userId = userModel.Id
 	} else {
 		userId = um.Id

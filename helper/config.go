@@ -20,9 +20,17 @@ type Config struct {
 	HttpPort         int      `yaml:"http_port"`          //服务启动端口
 	JwtKey           string   `yaml:"jwt_key"`            //jwt密钥
 	NewUser          bool     `yaml:"new_user"`           //是否允许新用户使用
+	NoRegisterText   string   `yaml:"noreg_text"`         //关闭注册时候的文字说明
 	CurlApi          []string `yaml:"curl_api"`           //远程请求API
 	Task             []string `yaml:"task"`               //任务corn触发时间
-	Smtp             struct {
+	NotifyImage      struct {
+		DomainUrl      string `yaml:"domain_url"`      //可用变量 {NAME} = SaveName的值
+		BackgroundFile string `yaml:"background_file"` //背景绘制图片
+		FontFile       string `yaml:"font_file"`
+		SaveName       string `yaml:"save_name"` //可用变量 {DATE} = 日期Y-m-d
+		SavePath       string `yaml:"save_path"` //可用变量 {NAME} = SaveName的值
+	} `yaml:"notify_image"`
+	Smtp struct {
 		Enable   bool   //是否启用
 		Host     string //邮件服务器地址
 		Port     int    //邮件服务器端口

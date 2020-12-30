@@ -30,14 +30,7 @@ func GetQQBot() *QQBot {
 	qqbot.key = conf.Key
 	return qqbot
 }
-
 func (this QQBot) SendMessage(target interface{}, textList []string) {
-	session, err := this.getSession()
-	if err != nil {
-		log.Info("获取session失败:", err)
-		return
-	}
-
 	txtList := make([]map[string]interface{}, 0)
 	for _, item := range textList {
 		txtList = append(txtList, map[string]interface{}{
@@ -45,16 +38,24 @@ func (this QQBot) SendMessage(target interface{}, textList []string) {
 			"text": item,
 		})
 	}
+	this.SendGroupMessage(target, txtList)
+}
+func (this QQBot) SendGroupMessage(target interface{}, elemList []map[string]interface{}) {
+	session, err := this.getSession()
+	if err != nil {
+		log.Info("获取session失败:", err)
+		return
+	}
 
 	u := fmt.Sprintf("%s/sendGroupMessage", this.url)
 	j := req.BodyJSON(map[string]interface{}{
 		"sessionKey":   session,
 		"target":       target,
-		"messageChain": txtList,
+		"messageChain": elemList,
 	})
 	res, err := req.Post(u, j)
 	if err != nil {
-		log.Info("发送失败:", err)
+		log.Info("发送失败: %s", err.Error())
 		return
 	}
 	json := struct {
@@ -63,7 +64,7 @@ func (this QQBot) SendMessage(target interface{}, textList []string) {
 		MessageId int
 	}{}
 	if err := res.ToJSON(&json); err != nil {
-		log.Info("发送失败:", err)
+		log.Info("发送失败: %s", err.Error())
 		return
 	}
 	if json.Code != 0 {

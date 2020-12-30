@@ -6,3 +6,4 @@ bin
 obj
 logs
 *.log
+/res

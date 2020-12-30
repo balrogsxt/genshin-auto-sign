@@ -27,3 +27,9 @@ func IsUrl(str string) bool {
 	reg := regexp.MustCompile(pattern)
 	return reg.MatchString(str)
 }
+func IsQQEmail(str string) bool {
+	str = strings.ToLower(str)
+	pattern := `[0-9]+@qq.com$`
+	reg := regexp.MustCompile(pattern)
+	return reg.MatchString(str)
+}
